@@ -33,14 +33,22 @@ def load_vgg(sess, vgg_path):
     vgg_layer3_out_tensor_name = 'layer3_out:0'
     vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
-    
-    return None, None, None, None, None
+
+    tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
+    graph = tf.get_default_graph()
+    input_layer = graph.get_tensor_by_name(vgg_input_tensor_name)
+    prob_layer =  graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
+    layer3 =  graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
+    layer4 =  graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
+    layer7 =  graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
+
+    return input_layer, prob_layer, layer3, layer4, layer7
 tests.test_load_vgg(load_vgg, tf)
 
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
-    Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
+    Create the layers for a fully-connected convolutional network.  Build skip-layers using the vgg layers.
     :param vgg_layer3_out: TF Tensor for VGG Layer 3 output
     :param vgg_layer4_out: TF Tensor for VGG Layer 4 output
     :param vgg_layer7_out: TF Tensor for VGG Layer 7 output
@@ -48,6 +56,30 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function
+    # Concept: Section "Special techniques" in the knowledge.md. Full version: scene understanding, FCN-8-Decoder from the classroom
+    # We must add 1x1 convolutions on top of the VGG to reduce the number of filters from 4096 to the number of classes for our specific model.
+    padding = 'same'
+    kernel_size_in = 1
+    # kernel_regulizer gives us the Regulizer. If it isn't applied - the weight will become too large and will be prone to overfitting. As a result you'll get [Insufficient Result](./examples/insufficient_result.png)
+    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_in, padding = padding,
+                                kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
+
+    # perform de-convolution (a.k.a transpose convolution or upsampling)
+    kernel_size_out = 4
+    stride = 2 # this does the up-sampling by 2
+    output = tf.layers.conv2d_transpose(conv_1x1, num_classes, kernel_size_out, stride, padding = padding,
+                                        kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
+    # Question marks indicate, that the dimentions aren't set yet, cause we allow any size of images. 
+    # Helps for debugging: what output in the conv_1x1 dimentions are?
+    tf.Print(output, [tf.shape(output)[1:3]]) # 1:3 gives you x, y dimentions of the image
+
+    output_upsampled_x2 = tf.layers.conv2d_transpose(output, num_classes, kernel_size_out, stride, padding = padding,
+                                        kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
+    # ? Which layer? Classroom! Strides 2, 2 & 2, 2 & 8, 8.
+    #output_upsampled_x8 = tf.layers.conv2d_transpose(output_upsampled_x2, num_classes, kernel_size_out, stride, padding = padding,
+    #                                    kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
+
+    # Do upsampling for other layers. Get insipired by the "Skip connections" section the knowledge.md or the classroom.
     return None
 tests.test_layers(layers)
 
@@ -62,8 +94,13 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     # TODO: Implement function
+    # Concept: knowledge.md & Classroom: FCN-8 - Classification & Loss
+    # The output tensor is 4D so we have to reshape it to 2D (flat image, where high = numer of classes and width = amount of pixels).
+    # Use adam optimizer, cause it has fewer hyperparams and other things fall in, like decane, learning rate. Also we can speed the back entrophy loss.
+
+    logits = tf.reshape(input, (-1, num_classes))
     return None, None, None
-tests.test_optimize(optimize)
+#tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -82,8 +119,13 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    # Main thing is to understand, what the get_batches_fn() is doing, cause it is doing a lot of heavy-lifting for you.
+    for epoch in epochs:
+        for image, label in get_batches_fn(batch_size):
+            # Perform training
+            # Define losses = session.run do this on the trainer optimizer and cross-entrophy loss (same function that we've just implemented)
     pass
-tests.test_train_nn(train_nn)
+#tests.test_train_nn(train_nn)
 
 
 def run():
@@ -109,9 +151,16 @@ def run():
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
+        # Mischa: Defines, with how many epochs (6?) are we going to work with. Keep batch_size small.
+        # Mischa: It's going to create some templates for doing learning rate (float value) and also the correct labels (4D values (batch, higth, width, num_of_classes)).
+
         # TODO: Build NN using load_vgg, layers, and optimize function
+        input_image, keep_probability, layer3, layer4, layer7 = load_vgg(sess, vgg_path)
+        NN_final_layer = layers(layer3, layer4, layer7, num_classes)
+        # call optimizer
 
         # TODO: Train NN using the train_nn function
+        train_nn()
 
         # TODO: Save inference data using helper.save_inference_samples
         #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
