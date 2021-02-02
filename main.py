@@ -25,8 +25,6 @@ def load_vgg(sess, vgg_path):
     :param vgg_path: Path to vgg folder, containing "variables/" and "saved_model.pb"
     :return: Tuple of Tensors from VGG model (image_input, keep_prob, layer3_out, layer4_out, layer7_out)
     """
-    # TODO: Implement function
-    #   Use tf.saved_model.loader.load to load the model and weights
     vgg_tag = 'vgg16'
     vgg_input_tensor_name = 'image_input:0'
     vgg_keep_prob_tensor_name = 'keep_prob:0'
@@ -34,7 +32,7 @@ def load_vgg(sess, vgg_path):
     vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
 
-    tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
+    tf.saved_model.loader.load(sess, [vgg_tag], vgg_path) # load the model and weights
     graph = tf.get_default_graph()
     input_layer = graph.get_tensor_by_name(vgg_input_tensor_name)
     prob_layer =  graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
@@ -55,32 +53,47 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    # TODO: Implement function
     # Concept: Section "Special techniques" in the knowledge.md. Full version: scene understanding, FCN-8-Decoder from the classroom
-    # We must add 1x1 convolutions on top of the VGG to reduce the number of filters from 4096 to the number of classes for our specific model.
+
     padding = 'same'
     kernel_size_in = 1
-    # kernel_regulizer gives us the Regulizer. If it isn't applied - the weight will become too large and will be prone to overfitting. As a result you'll get [Insufficient Result](./examples/insufficient_result.png)
-    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_in, padding = padding,
-                                kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
+
+    l7_l4_kernel_size_out = 4
+    l3_kernel_size_out = 16
+    l7_l4_strides= (2, 2) # this does the up-sampling by 2
+    l7_l4_l3_strides= (8, 8)
+
+    # kernel_regulizer gives us the Regulizer.
+    # If it isn't applied - the weight will become too large and will be prone to overfitting.
+    # As a result you'll get [Insufficient Result](./examples/insufficient_result.png)
+    l7_conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, kernel_size_in, padding=padding,
+                                kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+
+    l4_conv_1x1 = tf.layers.conv2d(vgg_layer4_out, num_classes, kernel_size_in, padding=padding,
+                                kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+
+    l3_conv_1x1 = tf.layers.conv2d(vgg_layer3_out, num_classes, kernel_size_in, padding=padding,
+                                kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
 
     # perform de-convolution (a.k.a transpose convolution or upsampling)
-    kernel_size_out = 4
-    stride = 2 # this does the up-sampling by 2
-    output = tf.layers.conv2d_transpose(conv_1x1, num_classes, kernel_size_out, stride, padding = padding,
-                                        kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
-    # Question marks indicate, that the dimentions aren't set yet, cause we allow any size of images. 
+    l7_upsampled = tf.layers.conv2d_transpose(l7_conv_1x1, num_classes, l7_l4_kernel_size_out, strides=l7_l4_strides, padding=padding,
+                                        kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+
+    # Add 1x1 convolutions on top of the VGG to reduce the number of filters from 4096 to the number of classes for our specific model.
+    l7_l4_combined = tf.add(l7_upsampled, l4_conv_1x1)
+    l7_l4_upsampled = tf.layers.conv2d_transpose(l7_l4_combined, num_classes, l7_l4_kernel_size_out, strides=l7_l4_strides, padding=padding,
+                                        kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+
+    l7_l4_l3_combined = tf.add(l7_l4_upsampled, l3_conv_1x1)
+    l7_l4_l3_upsampled = tf.layers.conv2d_transpose(l7_l4_l3_combined, num_classes, l3_kernel_size_out, strides=l7_l4_l3_strides, padding=padding,
+                                        kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+
+    # Question marks indicate, that the dimentions aren't set yet, cause we allow any size of images.
     # Helps for debugging: what output in the conv_1x1 dimentions are?
-    tf.Print(output, [tf.shape(output)[1:3]]) # 1:3 gives you x, y dimentions of the image
+    # tf.Print(l7_l4_upsampled, [tf.shape(l7_l4_upsampled)[1:3]]) # 1:3 gives you x, y dimentions of the image
+    # tf.Print(l7_l4_l3_upsampled, [tf.shape(l7_l4_l3_upsampled)[1:3]]) # 1:3 gives you x, y dimentions of the image
 
-    output_upsampled_x2 = tf.layers.conv2d_transpose(output, num_classes, kernel_size_out, stride, padding = padding,
-                                        kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
-    # ? Which layer? Classroom! Strides 2, 2 & 2, 2 & 8, 8.
-    #output_upsampled_x8 = tf.layers.conv2d_transpose(output_upsampled_x2, num_classes, kernel_size_out, stride, padding = padding,
-    #                                    kernel_regularizer = tf.contrib.layers.l2_regulizer(1e-3))
-
-    # Do upsampling for other layers. Get insipired by the "Skip connections" section the knowledge.md or the classroom.
-    return None
+    return l7_l4_l3_upsampled
 tests.test_layers(layers)
 
 
@@ -124,7 +137,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         for image, label in get_batches_fn(batch_size):
             # Perform training
             # Define losses = session.run do this on the trainer optimizer and cross-entrophy loss (same function that we've just implemented)
-    pass
+            pass
 #tests.test_train_nn(train_nn)
 
 
