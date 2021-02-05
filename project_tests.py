@@ -45,7 +45,7 @@ def _assert_tensor_shape(tensor, shape, display_name):
     :param shape: Some array
     :param display_name: Name of tensor to print if assertions fail
     """
-    assert tf.assert_rank(tensor, len(shape), message='{} has wrong rank'.format(display_name))
+    assert tf.compat.v1.assert_rank(tensor, len(shape), message='{} has wrong rank'.format(display_name))
 
     tensor_shape = tensor.get_shape().as_list() if len(shape) else []
 
@@ -81,12 +81,12 @@ def test_load_vgg(load_vgg, tf_module):
     """
     with TmpMock(tf_module.saved_model.loader, 'load') as mock_load_model:
         vgg_path = ''
-        sess = tf.Session()
-        test_input_image = tf.placeholder(tf.float32, name='image_input')
-        test_keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        test_vgg_layer3_out = tf.placeholder(tf.float32, name='layer3_out')
-        test_vgg_layer4_out = tf.placeholder(tf.float32, name='layer4_out')
-        test_vgg_layer7_out = tf.placeholder(tf.float32, name='layer7_out')
+        sess = tf.compat.v1.Session()
+        test_input_image = tf.compat.v1.placeholder(tf.float32, name='image_input')
+        test_keep_prob = tf.compat.v1.placeholder(tf.float32, name='keep_prob')
+        test_vgg_layer3_out = tf.compat.v1.placeholder(tf.float32, name='layer3_out')
+        test_vgg_layer4_out = tf.compat.v1.placeholder(tf.float32, name='layer4_out')
+        test_vgg_layer7_out = tf.compat.v1.placeholder(tf.float32, name='layer7_out')
 
         input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
 
@@ -109,9 +109,9 @@ def test_layers(layers):
     param: layers: An implemented `layers()` function with deconvolutional layers in a FCN.
     """
     num_classes = 2
-    vgg_layer3_out = tf.placeholder(tf.float32, [None, None, None, 256])
-    vgg_layer4_out = tf.placeholder(tf.float32, [None, None, None, 512])
-    vgg_layer7_out = tf.placeholder(tf.float32, [None, None, None, 4096])
+    vgg_layer3_out = tf.compat.v1.placeholder(tf.float32, [None, None, None, 256])
+    vgg_layer4_out = tf.compat.v1.placeholder(tf.float32, [None, None, None, 512])
+    vgg_layer7_out = tf.compat.v1.placeholder(tf.float32, [None, None, None, 4096])
     layers_output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes)
 
     _assert_tensor_shape(layers_output, [None, None, None, num_classes], 'Layers Output')
@@ -127,14 +127,14 @@ def test_optimize(optimize):
     num_classes = 2
     shape = [2, 3, 4, num_classes]
     layers_output = tf.Variable(tf.zeros(shape))
-    correct_label = tf.placeholder(tf.float32, [None, None, None, num_classes])
-    learning_rate = tf.placeholder(tf.float32)
+    correct_label = tf.compat.v1.placeholder(tf.float32, [None, None, None, num_classes])
+    learning_rate = tf.compat.v1.placeholder(tf.float32)
     logits, train_op, cross_entropy_loss = optimize(layers_output, correct_label, learning_rate, num_classes)
 
     _assert_tensor_shape(logits, [2*3*4, num_classes], 'Logits')
 
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
         sess.run([train_op], {correct_label: np.arange(np.prod(shape)).reshape(shape), learning_rate: 10})
         test, loss = sess.run([layers_output, cross_entropy_loss], {correct_label: np.arange(np.prod(shape)).reshape(shape)})
 
@@ -156,11 +156,11 @@ def test_train_nn(train_nn):
 
     train_op = tf.constant(0)
     cross_entropy_loss = tf.constant(10.11)
-    input_image = tf.placeholder(tf.float32, name='input_image')
-    correct_label = tf.placeholder(tf.float32, name='correct_label')
-    keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-    learning_rate = tf.placeholder(tf.float32, name='learning_rate')
-    with tf.Session() as sess:
+    input_image = tf.compat.v1.placeholder(tf.float32, name='input_image')
+    correct_label = tf.compat.v1.placeholder(tf.float32, name='correct_label')
+    keep_prob = tf.compat.v1.placeholder(tf.float32, name='keep_prob')
+    learning_rate = tf.compat.v1.placeholder(tf.float32, name='learning_rate')
+    with tf.compat.v1.Session() as sess:
         parameters = {
             'sess': sess,
             'epochs': epochs,

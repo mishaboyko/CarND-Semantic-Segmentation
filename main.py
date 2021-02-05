@@ -33,7 +33,7 @@ def load_vgg(sess, vgg_path):
     vgg_layer7_out_tensor_name = 'layer7_out:0'
 
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_path) # load the model and weights
-    graph = tf.get_default_graph()
+    graph = tf.compat.v1.get_default_graph()
     input_layer = graph.get_tensor_by_name(vgg_input_tensor_name)
     prob_layer =  graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
     layer3 =  graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
@@ -175,7 +175,7 @@ def run():
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
 
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
         # Create function to get batches
