@@ -111,9 +111,29 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     # The output tensor is 4D so we have to reshape it to 2D (flat image, where high = numer of classes and width = amount of pixels).
     # Use adam optimizer, cause it has fewer hyperparams and other things fall in, like decane, learning rate. Also we can speed the back entrophy loss.
 
-    logits = tf.reshape(input, (-1, num_classes))
-    return None, None, None
-#tests.test_optimize(optimize)
+    # reshape the output 4D tesor to 2D
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+
+    # Is it necessary?
+    # correct_label = tf.reshape(correct_label, (-1, num_classes))
+
+
+    # compare the logits with the ground truth labels and calculate the cross-entrophy.
+    # cross-entrophy is just a measure how different the 2D-logits are from the ground truth training labels
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits)
+
+    # average the cross-entrophy from all the training images
+    loss_operation = tf.reduce_mean(cross_entropy)
+
+    # use adam algorithm to minimize the loss function, similarly to what stochastic gradient descent does.
+    optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate = learning_rate)
+
+    #  uses back-propagation to update the network and minimize the training loss
+    training_operation = optimizer.minimize(loss_operation)
+
+    # logits, train_op, cross_entropy_loss
+    return logits, training_operation, loss_operation
+tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
