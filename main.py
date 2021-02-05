@@ -111,7 +111,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     # The output tensor is 4D so we have to reshape it to 2D (flat image, where high = numer of classes and width = amount of pixels).
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
 
-    # Is it necessary?
+    # If the anount of labels differs from anount of classes
     # correct_label = tf.reshape(correct_label, (-1, num_classes))
 
 
@@ -120,17 +120,17 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits)
 
     # average the cross-entrophy from all the training images
-    loss_operation = tf.reduce_mean(cross_entropy)
+    cross_entropy_loss = tf.reduce_mean(cross_entropy)
 
     # use adam algorithm to minimize the loss function, similarly to what stochastic gradient descent does.
     # Also it has fewer hyperparams and other things fall in, like decane, learning rate. Also we can speed the back entrophy loss.
     optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate = learning_rate)
 
     #  uses back-propagation to update the network and minimize the training loss
-    training_operation = optimizer.minimize(loss_operation)
+    training_operation = optimizer.minimize(cross_entropy_loss)
 
     # logits, train_op, cross_entropy_loss
-    return logits, training_operation, loss_operation
+    return logits, training_operation, cross_entropy_loss
 tests.test_optimize(optimize)
 
 
@@ -149,14 +149,18 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
-    # Main thing is to understand, what the get_batches_fn() is doing, cause it is doing a lot of heavy-lifting for you.
-    for epoch in epochs:
+    sess.run(tf.global_variables_initializer())
+
+    for epoch in range(epochs):
+        # Main thing is to understand, what the get_batches_fn() is doing, cause it is doing a lot of heavy-lifting for you.
         for image, label in get_batches_fn(batch_size):
+            feed = {input_image: image, correct_label: label, keep_prob:0.5}
             # Perform training
-            # Define losses = session.run do this on the trainer optimizer and cross-entrophy loss (same function that we've just implemented)
-            pass
-#tests.test_train_nn(train_nn)
+            # Define losses = session.run do this on the trainer optimizer and cross-entrophy loss
+            _, loss = sess.run([train_op, cross_entropy_loss], feed_dict=feed)
+            print("Loss: {:.5f} at Epoch {}/{}".format(loss, epoch, epochs))
+        print()
+tests.test_train_nn(train_nn)
 
 
 def run():
@@ -174,6 +178,16 @@ def run():
     #  https://www.cityscapes-dataset.com/
 
     with tf.compat.v1.Session() as sess:
+        # the more epochs, the better the model will train, but the longer training will take
+        epochs = 50
+
+        # how many traing images to run through the network at a time.
+        batch_size = 5
+
+        # learning rate tell the network how quickly to update the weight
+        learning_rate = 0.0001
+
+
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
         # Create function to get batches
@@ -181,23 +195,23 @@ def run():
 
         # OPTIONAL: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
+        # It's going to create some templates for doing learning rate (float value) and also the correct labels (4D values (batch, higth, width, num_of_classes)).
 
-        # Mischa: Defines, with how many epochs (6?) are we going to work with. Keep batch_size small.
-        # Mischa: It's going to create some templates for doing learning rate (float value) and also the correct labels (4D values (batch, higth, width, num_of_classes)).
-
-        # TODO: Build NN using load_vgg, layers, and optimize function
+        # Build NN using load_vgg, layers, and optimize function
         input_image, keep_probability, layer3, layer4, layer7 = load_vgg(sess, vgg_path)
         NN_final_layer = layers(layer3, layer4, layer7, num_classes)
-        # call optimizer
 
-        # TODO: Train NN using the train_nn function
-        # train_nn()
+        correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
 
-        # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        logits, training_operation, cross_entropy_loss = optimize(NN_final_layer, correct_label, learning_rate, num_classes)
+
+        # Train NN
+        train_nn(sess, epochs, batch_size, get_batches_fn, training_operation, cross_entropy_loss, input_image, correct_label, keep_probability, learning_rate)
+
+        # Save inference data using helper.save_inference_samples
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_probability, input_image)
 
         # OPTIONAL: Apply the trained model to a video
-
 
 if __name__ == '__main__':
     run()
