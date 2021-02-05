@@ -106,12 +106,9 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    # TODO: Implement function
     # Concept: knowledge.md & Classroom: FCN-8 - Classification & Loss
-    # The output tensor is 4D so we have to reshape it to 2D (flat image, where high = numer of classes and width = amount of pixels).
-    # Use adam optimizer, cause it has fewer hyperparams and other things fall in, like decane, learning rate. Also we can speed the back entrophy loss.
 
-    # reshape the output 4D tesor to 2D
+    # The output tensor is 4D so we have to reshape it to 2D (flat image, where high = numer of classes and width = amount of pixels).
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
 
     # Is it necessary?
@@ -126,6 +123,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     loss_operation = tf.reduce_mean(cross_entropy)
 
     # use adam algorithm to minimize the loss function, similarly to what stochastic gradient descent does.
+    # Also it has fewer hyperparams and other things fall in, like decane, learning rate. Also we can speed the back entrophy loss.
     optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate = learning_rate)
 
     #  uses back-propagation to update the network and minimize the training loss
@@ -193,7 +191,7 @@ def run():
         # call optimizer
 
         # TODO: Train NN using the train_nn function
-        train_nn()
+        # train_nn()
 
         # TODO: Save inference data using helper.save_inference_samples
         #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
